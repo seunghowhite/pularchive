@@ -3,92 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 /** 샘플 1 — 아래 로직은 의도적으로 다른 페이지와 복붙용으로 중복합니다. */
 
-type Kind = "image" | "text" | "video";
-
-const TEXT_POOL = [
-  "빛은 어둠 속에서만 가장 또렷하게 보인다.",
-  "기록은 기억보다 오래 남는다.",
-  "한 장의 사진은 시간의 단면이다.",
-  "무작위는 때로 가장 솔직한 큐레이션이다.",
-];
-
-/**
- * YouTube 공유 링크(youtu.be, watch?v=) 또는 11자 영상 ID만 넣으면 됩니다.
- * 임베드: https://www.youtube.com/embed/VIDEO_ID
- */
-const YOUTUBE_VIDEO_URLS = [
-  "https://youtu.be/xrRDlOWR1OU?si=l1sAlUg6XHDoulqB",
-] as const;
-
-/** 링크·ID → 영상 ID (예: xrRDlOWR1OU) */
-function youtubeVideoIdFromInput(input: string): string {
-  const s = input.trim();
-  if (/^[\w-]{11}$/.test(s)) return s;
-  const short = s.match(/youtu\.be\/([^?&/]+)/);
-  if (short?.[1]) return short[1];
-  const v = s.match(/[?&]v=([^&]+)/);
-  if (v?.[1]) return v[1];
-  const embed = s.match(/\/embed\/([^?&/]+)/);
-  if (embed?.[1]) return embed[1];
-  return s;
-}
-
-function youtubeEmbedSrc(videoId: string): string {
-  const id = encodeURIComponent(youtubeVideoIdFromInput(videoId));
-  return `https://www.youtube.com/embed/${id}?rel=0`;
-}
-
-const LOCAL_IMAGES = [
-  "/images/1.jpg",
-  "/images/2.jpg",
-  "/images/3.jpg",
-  "/images/4.jpg",
-  "/images/5.jpg",
-] as const;
-
-function pickKind(): Kind {
-  const r = Math.random();
-  if (r < 1 / 3) return "image";
-  if (r < 2 / 3) return "text";
-  return "video";
-}
-
-function randomImageUrl(): string {
-  const i = Math.floor(Math.random() * LOCAL_IMAGES.length);
-  return LOCAL_IMAGES[i]!;
-}
-
-function randomText(): string {
-  return TEXT_POOL[Math.floor(Math.random() * TEXT_POOL.length)]!;
-}
-
-function randomYoutubeVideoId(): string {
-  const i = Math.floor(Math.random() * YOUTUBE_VIDEO_URLS.length);
-  return youtubeVideoIdFromInput(YOUTUBE_VIDEO_URLS[i]!);
-}
+const LAMBDA_URL = "https://ijlhkc5rw4bh5d3as5x7o7qpje0pctgd.lambda-url.ap-northeast-2.on.aws/";
 
 export default function HOME() {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<Kind>("text");
-  const [payload, setPayload] = useState<{
-    image: string;
-    text: string;
-    video: string;
-  }>({
+  const [payload, setPayload] = useState<{ image: string }>({
     image: "",
-    text: "",
-    video: "",
   });
 
-  // 무작위 열기 함수
-  const openRandom = useCallback(() => {
-    const nextKind = pickKind();
-    setKind(nextKind);
-    setPayload({
-      image: randomImageUrl(),
-      text: randomText(),
-      video: randomYoutubeVideoId(),
-    });
+  const openRandom = useCallback(async () => {
+    const res = await fetch(LAMBDA_URL);
+    const data = (await res.json()) as { url: string };
+    setPayload({ image: data.url });
     setOpen(true);
   }, []);
 
@@ -123,9 +49,9 @@ export default function HOME() {
             type="button"
             aria-label="random"
             onClick={openRandom}
-            className=" border-0 bg-transparent  text-black font-mono"
+            className="cursor-pointer border-2 border-black bg-transparent text-3xl text-black font-[-apple-system,BlinkMacSystemFont,'Helvetica_Neue',Helvetica,Arial,sans-serif] px-3 py-1"
           >
-            sample text
+            Take a Seat
           </button>
         </div>
       </div>
@@ -135,7 +61,8 @@ export default function HOME() {
           <button
             type="button"
             aria-label="배경을 눌러 닫기"
-            className="absolute inset-0 touch-manipulation bg-zinc-950/55 backdrop-blur-md"
+            // className="absolute inset-0 touch-manipulation bg-zinc-950/55 backdrop-blur-md"
+                 className="absolute inset-0 touch-manipulation "
             onClick={close}
           />
 
@@ -146,31 +73,12 @@ export default function HOME() {
             className="pointer-events-none absolute inset-0 z-10 flex min-h-0 items-center justify-center pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pl-[max(0.75rem,env(safe-area-inset-left))] sm:pr-[max(0.75rem,env(safe-area-inset-right))]"
           >
             <div className="pointer-events-none flex min-h-0 w-full max-w-full flex-col items-center justify-center overflow-y-auto overscroll-y-contain">
-              {kind === "image" ? (
-                /* eslint-disable-next-line */
-                <img
-                  src={payload.image}
-                  alt="무작위 이미지"
-                  className="pointer-events-auto max-h-[min(92svh,920px)] w-auto max-w-full object-contain"
-                />
-              ) : null}
-
-              {kind === "text" ? (
-                <p className="pointer-events-auto max-w-2xl text-pretty px-4 text-center text-lg font-medium leading-relaxed text-white sm:text-xl md:text-2xl">
-                  {payload.text}
-                </p>
-              ) : null}
-
-              {kind === "video" ? (
-                <iframe
-                  title="YouTube"
-                  className="pointer-events-auto aspect-video max-h-[min(88svh,900px)] w-full max-w-[min(100%,1100px)] rounded-md border-0 bg-black"
-                  src={youtubeEmbedSrc(payload.video)}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                />
-              ) : null}
+              {/* eslint-disable-next-line */}
+              <img
+                src={payload.image}
+                alt="무작위 이미지"
+                className="pointer-events-auto max-h-[min(92svh,920px)] w-auto max-w-full object-contain"
+              />
             </div>
           </div>
         </div>
