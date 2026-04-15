@@ -64,7 +64,7 @@ export default function HOME() {
             aria-busy={loading}
             disabled={loading}
             onClick={openRandom}
-            className="cursor-pointer border-[1px] border-black bg-transparent px-3 py-1 text-3xl text-black font-[-apple-system,BlinkMacSystemFont,'Helvetica_Neue',Helvetica,Arial,sans-serif] transition-opacity disabled:cursor-wait disabled:opacity-40 "
+            className="cursor-pointer border-[1.5px] border-black bg-transparent px-3 py-1 text-3xl text-black font-[-apple-system,BlinkMacSystemFont,'Helvetica_Neue',Helvetica,Arial,sans-serif] transition-opacity disabled:cursor-wait disabled:opacity-40 "
           >
             Take a Seat
           </button>
