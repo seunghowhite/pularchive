@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const LAMBDA_URL = "https://ijlhkc5rw4bh5d3as5x7o7qpje0pctgd.lambda-url.ap-northeast-2.on.aws/";
@@ -37,14 +37,24 @@ export default function HOME() {
 
   const openRandom = useCallback(async () => {
     if (!nextPromise.current) prefetchNext();
-  
+
+    const minVisibleMs = 500;
+    const started = performance.now();
+
     setLoading(true);
     try {
       const url = await nextPromise.current!;
+      const elapsed = performance.now() - started;
+      if (elapsed < minVisibleMs) {
+        await new Promise<void>((r) => setTimeout(r, minVisibleMs - elapsed));
+      }
       setCurrentImage(url);
       setOpen(true);
-      // ← 여기서 prefetchNext() 제거
     } catch {
+      const elapsed = performance.now() - started;
+      if (elapsed < minVisibleMs) {
+        await new Promise<void>((r) => setTimeout(r, minVisibleMs - elapsed));
+      }
       prefetchNext();
     } finally {
       setLoading(false);
