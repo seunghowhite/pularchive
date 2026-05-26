@@ -1,14 +1,41 @@
 "use client";
 
-
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const LAMBDA_URL = "https://ijlhkc5rw4bh5d3as5x7o7qpje0pctgd.lambda-url.ap-northeast-2.on.aws/";
 
-// Lambda 호출 + 이미지 브라우저 캐시까지 완료
-async function fetchAndPreload(): Promise<string> {
+/**
+ * 배열 섞기
+ * @param arr 섞을 배열
+ * @returns 섞인 배열
+ */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * 키 목록 가져오기
+ * @returns 키 목록
+ */
+async function fetchKeys(): Promise<string[]> {
   const res = await fetch(LAMBDA_URL);
-  const data = (await res.json()) as { url: string };
+  const data = await res.json() as { keys: string[] };
+  return data.keys;
+}
+
+/**
+ * 이미지 로드 및 미리 로드
+ * @param key 키
+ * @returns 이미지 URL
+ */
+async function fetchAndPreload(key: string): Promise<string> {
+  const res = await fetch(`${LAMBDA_URL}?key=${encodeURIComponent(key)}`);
+  const data = await res.json() as { url: string };
   await new Promise<void>((resolve, reject) => {
     const img = new window.Image();
     img.onload = () => resolve();
@@ -23,18 +50,36 @@ export default function HOME() {
   const [loading, setLoading] = useState(false);
   const [currentImage, setCurrentImage] = useState("");
 
-  // 미리 준비 중인 다음 이미지 Promise
+  const deckRef = useRef<string[]>([]);
+  const indexRef = useRef(0);
   const nextPromise = useRef<Promise<string> | null>(null);
 
-  const prefetchNext = useCallback(() => {
-    nextPromise.current = fetchAndPreload();
+  const nextKey = useCallback((): string | null => {
+    const deck = deckRef.current;
+    if (deck.length === 0) return null;
+    if (indexRef.current >= deck.length) {
+      deckRef.current = shuffle(deck);
+      indexRef.current = 0;
+    }
+    return deckRef.current[indexRef.current++];
   }, []);
 
-  // 페이지 로드 시 첫 이미지 미리 준비
+  const prefetchNext = useCallback(() => {
+    const key = nextKey();
+    if (!key) return;
+    nextPromise.current = fetchAndPreload(key);
+  }, [nextKey]);
+
+  // 초기 데이터 로드
   useEffect(() => {
-    prefetchNext();
+    fetchKeys().then((keys) => {
+      deckRef.current = shuffle(keys);
+      indexRef.current = 0;
+      prefetchNext();
+    });
   }, [prefetchNext]);
 
+  // 랜덤 이미지 열기
   const openRandom = useCallback(async () => {
     if (!nextPromise.current) prefetchNext();
 
@@ -61,12 +106,13 @@ export default function HOME() {
     }
   }, [prefetchNext]);
 
+  // 이미지 닫기
   const close = useCallback(() => {
     setOpen(false);
-    prefetchNext(); // 닫을 때 다음 이미지 미리 로드
+    prefetchNext();
   }, [prefetchNext]);
-  
 
+  // 키보드 이벤트 처리
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -94,8 +140,8 @@ export default function HOME() {
             aria-busy={loading}
             disabled={loading}
             onClick={openRandom}
-            className="cursor-pointer border-[1.5px] border-black bg-transparent px-3 py-1 text-3xl text-black font-[-apple-system,BlinkMacSystemFont,'Helvetica_Neue',Helvetica,Arial,sans-serif] transition-opacity disabled:cursor-wait disabled:opacity-40 "
-            >
+            className="cursor-pointer border-[1.5px] border-black bg-transparent px-3 py-1 text-3xl text-black font-[-apple-system,BlinkMacSystemFont,'Helvetica_Neue',Helvetica,Arial,sans-serif] transition-opacity disabled:cursor-wait disabled:opacity-40"
+          >
             Take a Seat
           </button>
           {loading ? (
@@ -132,7 +178,7 @@ export default function HOME() {
             <div className="pointer-events-none flex min-h-0 w-full max-w-full flex-col items-center justify-center overflow-y-auto overscroll-y-contain">
               {currentImage ? (
                 <div className="pointer-events-auto inline-block max-w-[min(100%,1100px)] shrink-0">
-                 {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={currentImage}
                     alt="무작위 이미지"
