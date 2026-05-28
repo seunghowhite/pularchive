@@ -62,6 +62,7 @@ async function fetchAndPreload(key: string): Promise<string> {
 export default function HOME() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
   const [currentPair, setCurrentPair] = useState<ImagePair | null>(null);
 
   const imageDeckRef = useRef<string[]>([]);
@@ -95,18 +96,46 @@ export default function HOME() {
 
   // 초기 데이터 로드
   useEffect(() => {
-    fetchKeys().then(({ imageKeys, textKeys }) => {
+    let cancelled = false;
+
+    fetchKeys().then(async ({ imageKeys, textKeys }) => {
+      if (cancelled) return;
+
       imageDeckRef.current = shuffle(imageKeys);
       textDeckRef.current = shuffle(textKeys);
       imageIndexRef.current = 0;
       textIndexRef.current = 0;
       prefetchNext();
+
+      const promise = nextPromise.current;
+      if (!promise) return;
+
+      try {
+        await promise;
+        if (!cancelled) setReady(true);
+      } catch {
+        if (cancelled) return;
+        prefetchNext();
+        const retry = nextPromise.current;
+        if (!retry) return;
+        try {
+          await retry;
+          if (!cancelled) setReady(true);
+        } catch {
+          // 첫 prefetch 실패 시 ready 유지
+        }
+      }
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [prefetchNext]);
 
   // 랜덤 이미지 열기
   const openRandom = useCallback(async () => {
     if (!nextPromise.current) prefetchNext();
+    if (!nextPromise.current) return;
 
     const minVisibleMs = 500;
     const started = performance.now();
@@ -114,6 +143,9 @@ export default function HOME() {
     setLoading(true);
     try {
       const pair = await nextPromise.current!;
+      if (!pair?.imageUrl || !pair?.textUrl) {
+        throw new Error("이미지 쌍 로드 실패");
+      }
       const elapsed = performance.now() - started;
       if (elapsed < minVisibleMs) {
         await new Promise<void>((r) => setTimeout(r, minVisibleMs - elapsed));
@@ -158,6 +190,7 @@ export default function HOME() {
     };
   }, [open, close]);
 
+  
   return (
     <main className="relative min-h-dvh w-full overflow-hidden font-sans text-emerald-50">
       <div className="relative z-10 flex min-h-dvh flex-col items-center justify-center pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(1.5rem,env(safe-area-inset-top))]">
@@ -166,17 +199,17 @@ export default function HOME() {
             <button
               type="button"
               aria-label="random"
-              aria-busy={loading}
-              disabled={loading}
+              aria-busy={loading || !ready}
+              disabled={loading || !ready}
               onClick={openRandom}
               className="cursor-pointer border-[1.5px] border-black bg-transparent px-3 py-1 text-3xl text-black font-[-apple-system,BlinkMacSystemFont,'Helvetica_Neue',Helvetica,Arial,sans-serif] transition-opacity disabled:cursor-wait disabled:opacity-40"
             >
               Take a Seat
             </button>
           ) : null}
-          {loading && !open ? (
+          {(!ready || (loading && !open)) ? (
             <div role="status" className="flex h-5 items-end justify-center gap-1.5" aria-live="polite">
-              <span className="sr-only">이미지를 불러오는 중</span>
+              <span className="sr-only">{ready ? "이미지를 불러오는 중" : "이미지를 준비하는 중"}</span>
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
