@@ -237,8 +237,8 @@ export default function HOME() {
               aria-busy={loading}
               disabled={loading}
               onClick={openRandom}
-              className="pointer-events-auto inline-flex h-8 w-30 cursor-pointer items-center justify-center border border-black bg-white/80 text-sm text-black backdrop-blur-sm transition-opacity disabled:cursor-wait disabled:opacity-40"
-            >
+              className="pointer-events-auto inline-flex h-8 w-30 cursor-pointer items-center justify-center border border-black bg-white/80 text-sm text-black font-[Helvetica] backdrop-blur-sm transition-opacity disabled:cursor-wait disabled:opacity-40"
+              >
               {loading ? (
                 <span className="flex items-end justify-center gap-1" aria-live="polite">
                   <span className="sr-only">다음 이미지를 불러오는 중</span>
